@@ -30,53 +30,8 @@ class MJSONTranspiler:
         text = re.sub(r'\b~\b', 'null', text)
         return text
 
-    def parse(self, text):
-        """Parse MJSON into a Python dict using indentation rules."""
-        lines = [l for l in text.split('\n') if l.strip()]
-        stack = [{}]
-        indents = [0]
-
-        for line in lines:
-            indent = len(line) - len(line.lstrip())
-            keyval = line.strip()
-
-            # Array item
-            if keyval.startswith('- '):
-                item = {}
-                kv = keyval[2:]
-                if ':' in kv:
-                    k, v = kv.split(':', 1)
-                    item[k.strip()] = self._convert_value(v.strip())
-                # Ensure current container is a list
-                if not isinstance(stack[-1], list):
-                    arr = []
-                    parent = stack[-2]
-                    last_key = list(parent.keys())[-1]
-                    parent[last_key] = arr
-                    stack[-1] = arr
-                stack[-1].append(item)
-                stack.append(item)
-                indents.append(indent)
-                continue
-
-            # Key: value
-            if ':' in keyval:
-                k, v = keyval.split(':', 1)
-                k = k.strip()
-                v = v.strip()
-                val = self._convert_value(v) if v else {}
-                # Dedent
-                while indent < indents[-1]:
-                    stack.pop()
-                    indents.pop()
-                container = stack[-1]
-                container[k] = val
-                if isinstance(val, dict):
-                    stack.append(val)
-                    indents.append(indent)
-        return stack[0]
-
-    def _convert_value(self, v):
+    def parse_value(self, v):
+        v = v.strip()
         if v in ('true', 'false', 'null'):
             return json.loads(v)
         try:
@@ -89,8 +44,54 @@ class MJSONTranspiler:
                     inner = v[1:-1].strip()
                     if not inner:
                         return []
-                    return [self._convert_value(x.strip().strip(',')) for x in inner.split()]
+                    return [self.parse_value(x.strip().strip(',')) for x in inner.split(',') if x.strip()]
                 return v.strip('"')
+
+    def parse(self, text):
+        """Parse MJSON into Python objects using indentation."""
+        lines = [l for l in text.split('\n') if l.strip()]
+        root = {}
+        stack = [(0, root)]
+
+        for line in lines:
+            indent = len(line) - len(line.lstrip())
+            content = line.strip()
+
+            # Array item
+            if content.startswith('- '):
+                kv = content[2:]
+                item = {}
+                if ':' in kv:
+                    k, v = kv.split(':', 1)
+                    item[k.strip()] = self.parse_value(v.strip())
+                # Find nearest list container
+                while stack and not isinstance(stack[-1][1], list):
+                    stack.pop()
+                if not stack:
+                    raise ValueError("Array item without parent list")
+                stack[-1][1].append(item)
+                stack.append((indent, item))
+                continue
+
+            # Key: value
+            if ':' in content:
+                k, v = content.split(':', 1)
+                k = k.strip()
+                v = v.strip()
+                val = self.parse_value(v) if v else {}
+                # Dedent
+                while stack and indent < stack[-1][0]:
+                    stack.pop()
+                container = stack[-1][1]
+                if isinstance(container, dict):
+                    container[k] = val
+                elif isinstance(container, list):
+                    container[-1][k] = val
+                if isinstance(val, dict):
+                    stack.append((indent, val))
+                elif isinstance(val, list):
+                    stack.append((indent, val))
+        return root
 
     def transpile(self, mjson_text):
         text = self.strip_comments(mjson_text)
