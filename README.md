@@ -6,9 +6,6 @@
 
 JSON is excellent for machine-to-machine communication but can be tedious for humans to write and maintain. MJSON addresses these pain points by providing a more ergonomic syntax while maintaining full compatibility with JSON through compilation.
 
-## Installation
-Download a release or git clone.
-
 ### Philosophy
 
 MJSON is to JSON what Markdown is to HTML:
@@ -96,8 +93,8 @@ port: 8080
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/live-by-unix/ManuScriptJSON.git
-cd ManuScriptJSON
+git clone https://github.com/live-by-unix/manujson.git
+cd manujson
 ```
 
 2. The transpiler is ready to use:
