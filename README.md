@@ -6,6 +6,9 @@
 
 JSON is excellent for machine-to-machine communication but can be tedious for humans to write and maintain. MJSON addresses these pain points by providing a more ergonomic syntax while maintaining full compatibility with JSON through compilation.
 
+## Installation
+Download a release or git clone.
+
 ### Philosophy
 
 MJSON is to JSON what Markdown is to HTML:
