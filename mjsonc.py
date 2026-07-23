@@ -64,10 +64,10 @@ class MJSONTranspiler:
                 if ':' in kv:
                     k, v = kv.split(':', 1)
                     item[k.strip()] = self.parse_value(v.strip())
-                # Find nearest list container
+                # Attach to parent list
                 while stack and not isinstance(stack[-1][1], list):
                     stack.pop()
-                if not stack:
+                if not stack or not isinstance(stack[-1][1], list):
                     raise ValueError("Array item without parent list")
                 stack[-1][1].append(item)
                 stack.append((indent, item))
@@ -86,7 +86,8 @@ class MJSONTranspiler:
                 if isinstance(container, dict):
                     container[k] = val
                 elif isinstance(container, list):
-                    container[-1][k] = val
+                    if isinstance(container[-1], dict):
+                        container[-1][k] = val
                 if isinstance(val, dict):
                     stack.append((indent, val))
                 elif isinstance(val, list):
