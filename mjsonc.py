@@ -25,7 +25,7 @@ class MJSONTranspiler:
         return '\n'.join(lines)
 
     def normalize_shorthand(self, text):
-        # Replace shorthand BEFORE parsing/quoting
+        # Replace shorthand BEFORE parsing
         text = re.sub(r'\byes\b', 'true', text)
         text = re.sub(r'\bno\b', 'false', text)
         text = re.sub(r'\b~\b', 'null', text)
