@@ -47,6 +47,9 @@ class MJSONTranspiler:
                     if not inner:
                         return []
                     return [self.parse_value(x.strip().strip(',')) for x in inner.split(',') if x.strip()]
+                # ✅ Normalize "~" or quoted "~" → None
+                if v == '~' or v.strip('"').strip("'") == '~':
+                    return None
                 # ✅ Normalize quoted "null" → None
                 if v.strip('"').strip("'") == 'null':
                     return None
