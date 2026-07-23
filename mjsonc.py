@@ -33,6 +33,7 @@ class MJSONTranspiler:
 
     def parse_value(self, v):
         v = v.strip()
+        # ✅ Handle shorthand first
         if v in ('true', 'false', 'null'):
             return json.loads(v)
         try:
@@ -46,6 +47,9 @@ class MJSONTranspiler:
                     if not inner:
                         return []
                     return [self.parse_value(x.strip().strip(',')) for x in inner.split(',') if x.strip()]
+                # ✅ Normalize quoted "null" → None
+                if v.strip('"') == 'null':
+                    return None
                 return v.strip('"')
 
     def parse(self, text):
