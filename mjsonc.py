@@ -48,9 +48,9 @@ class MJSONTranspiler:
                         return []
                     return [self.parse_value(x.strip().strip(',')) for x in inner.split(',') if x.strip()]
                 # ✅ Normalize quoted "null" → None
-                if v.strip('"') == 'null':
+                if v.strip('"').strip("'") == 'null':
                     return None
-                return v.strip('"')
+                return v.strip('"').strip("'")
 
     def parse(self, text):
         """Parse MJSON into Python objects using indentation."""
