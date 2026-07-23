@@ -19,8 +19,8 @@ class MJSONTranspiler:
         text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
         lines = []
         for line in text.split('\n'):
-            line = re.split(r'(?<!["\'])#', line)[0]  # strip # outside strings
-            line = re.split(r'(?<!["\'])//', line)[0] # strip // outside strings
+            line = re.split(r'(?<!["\'])#', line)[0]
+            line = re.split(r'(?<!["\'])//', line)[0]
             lines.append(line)
         return '\n'.join(lines)
 
@@ -30,38 +30,73 @@ class MJSONTranspiler:
         text = re.sub(r'\b~\b', 'null', text)
         return text
 
+    def parse(self, text):
+        """Parse MJSON into a Python dict using indentation rules."""
+        lines = [l for l in text.split('\n') if l.strip()]
+        stack = [{}]
+        indents = [0]
+
+        for line in lines:
+            indent = len(line) - len(line.lstrip())
+            keyval = line.strip()
+
+            # Array item
+            if keyval.startswith('- '):
+                item = {}
+                kv = keyval[2:]
+                if ':' in kv:
+                    k, v = kv.split(':', 1)
+                    item[k.strip()] = self._convert_value(v.strip())
+                # Ensure current container is a list
+                if not isinstance(stack[-1], list):
+                    arr = []
+                    parent = stack[-2]
+                    last_key = list(parent.keys())[-1]
+                    parent[last_key] = arr
+                    stack[-1] = arr
+                stack[-1].append(item)
+                stack.append(item)
+                indents.append(indent)
+                continue
+
+            # Key: value
+            if ':' in keyval:
+                k, v = keyval.split(':', 1)
+                k = k.strip()
+                v = v.strip()
+                val = self._convert_value(v) if v else {}
+                # Dedent
+                while indent < indents[-1]:
+                    stack.pop()
+                    indents.pop()
+                container = stack[-1]
+                container[k] = val
+                if isinstance(val, dict):
+                    stack.append(val)
+                    indents.append(indent)
+        return stack[0]
+
+    def _convert_value(self, v):
+        if v in ('true', 'false', 'null'):
+            return json.loads(v)
+        try:
+            return int(v)
+        except ValueError:
+            try:
+                return float(v)
+            except ValueError:
+                if v.startswith('[') and v.endswith(']'):
+                    inner = v[1:-1].strip()
+                    if not inner:
+                        return []
+                    return [self._convert_value(x.strip().strip(',')) for x in inner.split()]
+                return v.strip('"')
+
     def transpile(self, mjson_text):
-        # Preprocess
         text = self.strip_comments(mjson_text)
         text = self.normalize_shorthand(text)
-
-        # Use Python's YAML-like parsing trick:
-        # Replace MJSON syntax with JSON-compatible
-        lines = []
-        for line in text.split('\n'):
-            if ':' in line:
-                key, val = line.split(':', 1)
-                key = key.strip()
-                val = val.strip()
-                if not key.startswith('"'):
-                    key = f'"{key}"'
-                if val and not val.startswith(('true','false','null','[','{','"')) and not val.replace('.','',1).isdigit():
-                    val = f'"{val}"'
-                line = f'{key}: {val}'
-            lines.append(line)
-
-        # Join and wrap root
-        body = '\n'.join(lines).strip()
-        if not body.startswith('{'):
-            body = '{\n' + body + '\n}'
-
-        # Fix arrays of objects (YAML-style)
-        body = re.sub(r'-\s*(.*)', r'{\1},', body)
-
-        # Ensure commas between properties
-        body = re.sub(r'("\w+": [^,\n]+)(\n\s*")', r'\1,\2', body)
-
-        return body
+        data = self.parse(text)
+        return json.dumps(data, indent=2)
 
 
 def transpile_file(input_path):
@@ -79,16 +114,9 @@ def transpile_file(input_path):
     transpiler = MJSONTranspiler()
     json_content = transpiler.transpile(mjson_content)
 
-    try:
-        parsed = json.loads(json_content)
-    except json.JSONDecodeError as e:
-        print(f"Error: Transpiled output is not valid JSON: {e}")
-        print(f"Output:\n{json_content}")
-        sys.exit(1)
-
     output_path = input_path.with_suffix('.json')
     with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(parsed, f, indent=2)
+        f.write(json_content)
 
     print(f"Successfully transpiled {input_path} to {output_path}")
     return output_path
